@@ -1,0 +1,89 @@
+#!/bin/bash
+
+declare -ig head_flag=0
+declare -ig tail_flag=0
+declare -ig NOL
+declare -ag query
+declare -rg base_url="https://wallhaven.cc/search?q="
+dferror="FlagError: can't use both flags at the same time."
+sferror="FlagError: can't use same flags more than once."
+
+function help { 
+  echo "Usage: ${0##*/} [ -q \"query\" ] [ -p/-t <int> ]" 1>&2 
+}
+
+function force_exit { 
+  help
+  exit 1
+}
+
+while getopts ":q:p:t:h" flags; do
+    case "${flags}" in
+    
+       q) 
+          query=${OPTARG}
+          ;;
+       p) 
+          head_flag+=1
+          if (( tail_flag==1 )); then
+            echo $dferror
+            force_exit
+          else 
+            if (( head_flag>1 )); then
+              echo $sferror
+              force_exit
+            fi
+          fi
+          NOL=${OPTARG}
+          ;;
+       t) 
+          tail_flag+=1
+          if (( head_flag==1 )); then
+            echo $dferror
+            force_exit
+          else 
+            if (( tail_flag>1 )); then
+              echo $sferror
+              force_exit
+            fi
+          fi
+          NOL=${OPTARG}
+          ;;
+       *) 
+          help
+          printf "Cli Option:- \n\
+        -q = specify the query string\
+          \n\t-p = specify n to download n no.s of jpeg files from top\
+          \n\t-t = specify n to download n no.s of jpeg files from bottom\
+          \n\t-h = show help section\n"
+          exit 1
+          ;;
+     esac
+done
+
+enc_query=$(echo $query | sed 's_[[space:]]_%20_g')
+
+pages=$(curl -s "$base_url$enc_query&categories=110&purity=100&sorting=relevance&order=desc&page=2" \
+   | grep -Eo 'thumb-listing-page-num">2</span> / [0-9]{1,}'| awk 'END {print (NR > 0 && NF > 0) ? $3 : 1}')
+
+
+for ((i=1 ; i <= $pages ; i++)); do
+   link_dump+=$(curl -s "$base_url$enc_query&categories=110&purity=100&sorting=relevance&order=desc&page=$i" \
+   | grep -Eo "https:\/\/th.wallhaven.cc\/small\/\w{2}\/\w{6}.jpg")
+done
+
+count=$(echo $link_dump | sed 's_ _\n_g' | wc -l)
+
+printf "Fetching %s jpeg files for the query: %s\n" "$NOL" "$enc_query"
+
+if [[ $NOL -gt $count ]]; then
+   printf "%s has only %s jpeg files. Defaulting to %s\n" "$enc_query" "$count" "$count"
+fi
+
+if (( head_flag == 1 )); then
+  wget $(echo $link_dump | sed 's_ _\n_g' | head -n $NOL)
+else
+  wget $(echo $link_dump | sed 's_ _\n_g' | tail -n $NOL)
+fi
+
+rm -f *.jpg.*
