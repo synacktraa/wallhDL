@@ -6,8 +6,9 @@
 
 declare -ig head_flag=0
 declare -ig tail_flag=0
-declare -ig NOL
+declare -ig getcnt
 declare -ag query
+declare -ag link_dump
 declare -rg base_url="https://wallhaven.cc/search?q="
 dferror="FlagError: can't use both flags at the same time."
 sferror="FlagError: can't use same flags more than once."
@@ -25,7 +26,7 @@ while getopts ":q:p:t:h" flags; do
     case "${flags}" in
     
        q) 
-          query=${OPTARG}
+          query="${OPTARG}"
           ;;
        p) 
           head_flag+=1
@@ -38,7 +39,7 @@ while getopts ":q:p:t:h" flags; do
               force_exit
             fi
           fi
-          NOL=${OPTARG}
+          getcnt=${OPTARG}
           ;;
        t) 
           tail_flag+=1
@@ -51,7 +52,7 @@ while getopts ":q:p:t:h" flags; do
               force_exit
             fi
           fi
-          NOL=${OPTARG}
+          getcnt=${OPTARG}
           ;;
        *) 
           help
@@ -75,30 +76,56 @@ getf() {
   fi
 }
 
-[ -z "$*" ] && printf "Query: " && read -r query && getf && printf "Jpeg files count: " && read -r NOL
+[ -z "$*" ] && printf "Query: " && read -r query && getf && printf "Jpeg files count: " && read -r getcnt
 
-enc_query=$(echo $query | sed 's_[[space:]]_%20_g')
+enc_query=$(echo "$query" | sed 's_ _%20_g')
 
-pages=$(curl -s "$base_url$enc_query&categories=110&purity=100&sorting=relevance&order=desc&page=2" \
+validate=$(curl -s  "${base_url}${enc_query}" | grep -o "There's nothing here...")
+[[ ! -z "$validate" ]] && echo "Sorry dude, something went wrong." && exit 1
+
+t_pages=$(curl -s "$base_url$enc_query&categories=110&purity=100&sorting=relevance&order=desc&page=2" \
    | grep -Eo 'thumb-listing-page-num">2</span> / [0-9]{1,}'| awk 'END {print (NR > 0 && NF > 0) ? $3 : 1}')
 
+last_page_file_count=$(curl -s "${base_url}${enc_query}&categories=110&purity=100&sorting=relevance&order=desc&page=${t_pages}" \
+	| grep -Eo "https:\/\/th.wallhaven.cc\/small\/\w{2}\/\w{6}.jpg" | wc -l)
 
-for ((i=1 ; i <= $pages ; i++)); do
-   link_dump+=$(curl -s "$base_url$enc_query&categories=110&purity=100&sorting=relevance&order=desc&page=$i" \
-   | grep -Eo "https:\/\/th.wallhaven.cc\/small\/\w{2}\/\w{6}.jpg")
-done
+wpcnt=$(( ${last_page_file_count} + $(expr 24 \* $(( ${t_pages} - 1 ))) ))
+printf "Found %d jpeg files for the query: %s\n" "$wpcnt" "$query"
 
-count=$(echo $link_dump | sed 's_ _\n_g' | wc -l)
-
-printf "Fetching %s jpeg files for the query: %s\n" "$NOL" "$enc_query"
-
-if [[ $NOL -gt $count ]]; then
-   printf "%s has only %s jpeg files. Defaulting to %s\n" "$enc_query" "$count" "$count"
+if [[ $getcnt -gt $wpcnt ]]; then
+     getcnt=$wpcnt
+     printf "Query out of range. Defaulting to %s\n" "$getcnt"
+     l_pages=$t_pages
+elif [[ $(( $getcnt % 24 )) == 0 ]]; then
+     l_pages=$(( $getcnt / 24 ))
+else
+     l_pages=$(expr $(( $getcnt / 24 )) + 1)
 fi
 
+
+get_ldump() {
+    
+    link_dump+=$(curl -s "$base_url$enc_query&categories=110&purity=100&sorting=relevance&order=desc&page=$1" \
+     | grep -Eo "https:\/\/th.wallhaven.cc\/small\/\w{2}\/\w{6}.jpg"; echo " ")
+}
+
 if (( head_flag == 1 )); then
-  wget $(echo $link_dump | sed 's_ _\n_g' | head -n $NOL)
+    for (( i=1 ; i <= $l_pages ; i++ )); do
+	get_ldump $i
+    done
+
+elif (( tail_flag == 1 )); then
+    for (( i=$t_pages; i >= $(( $t_pages - $l_pages )); i-- )); do
+	get_ldump $i
+    done
+fi
+
+printf "Fetching %d jpeg image files for the query: %s\n" "$getcnt" "$query"
+
+if (( head_flag == 1 )); then
+	wget -s $(echo $link_dump | sed 's_ _\n_g' | head -n $getcnt)
 else
-  wget $(echo $link_dump | sed 's_ _\n_g' | tail -n $NOL)
+	wget -s $(echo $link_dump | sed 's_ _\n_g' | tail -n $getcnt)
+
 fi
 rm -f *.jpg.*
