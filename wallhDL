@@ -8,11 +8,11 @@ declare -rg base_url="https://wallhaven.cc/search?q="
 dferror="FlagError: can't use both flags at the same time."
 sferror="FlagError: can't use same flags more than once."
 
-function help { 
+help() { 
   echo "Usage: ${0##*/} [ -q \"query\" ] [ -p/-t <int> ]" 1>&2 
 }
 
-function force_exit { 
+force_exit() { 
   help
   exit 1
 }
@@ -61,7 +61,7 @@ while getopts ":q:p:t:h" flags; do
      esac
 done
 
-function getf {
+getf() {
   printf "1) top\n2) bottom\n: " 
   read -r sel
   if (( sel == 1 )); then 
