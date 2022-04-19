@@ -61,6 +61,18 @@ while getopts ":q:p:t:h" flags; do
      esac
 done
 
+function getf {
+  printf "1) top\n2) bottom\n: " 
+  read -r sel
+  if (( sel == 1 )); then 
+    head_flag=1
+  else 
+    tail_flag=1 
+  fi
+}
+
+[ -z "$*" ] && printf "Query: " && read -r query && getf && printf "Jpeg files count: " && read -r NOL
+
 enc_query=$(echo $query | sed 's_[[space:]]_%20_g')
 
 pages=$(curl -s "$base_url$enc_query&categories=110&purity=100&sorting=relevance&order=desc&page=2" \
@@ -85,5 +97,4 @@ if (( head_flag == 1 )); then
 else
   wget $(echo $link_dump | sed 's_ _\n_g' | tail -n $NOL)
 fi
-
 rm -f *.jpg.*
