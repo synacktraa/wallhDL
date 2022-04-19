@@ -123,9 +123,9 @@ fi
 printf "Fetching %d jpeg image files for the query: %s\n" "$getcnt" "$query"
 
 if (( head_flag == 1 )); then
-	wget -s $(echo $link_dump | sed 's_ _\n_g' | head -n $getcnt)
+	wget -q $(echo $link_dump | sed 's_ _\n_g' | head -n $getcnt)
 else
-	wget -s $(echo $link_dump | sed 's_ _\n_g' | tail -n $getcnt)
+	wget -q $(echo $link_dump | sed 's_ _\n_g' | tail -n $getcnt)
 
 fi
 rm -f *.jpg.*
