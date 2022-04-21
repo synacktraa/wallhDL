@@ -1,25 +1,64 @@
 #!/bin/bash
 
-
 #An inefficient program to download anime wallpapers from wallhaven.cc
 
+a_red="\033[1;31m"
+a_green="\033[1;32m"
+a_yellow="\033[1;33m"
+a_blue="\033[1;34m"
+a_magenta="\033[1;35m"
+a_cyan="\033[1;36m"
+a_reset="\033[0m"
 
-declare -ig head_flag=0
-declare -ig tail_flag=0
-declare -ig getcnt
-declare -ag query
-declare -ag link_dump
-declare -rg base_url="https://wallhaven.cc/search?q="
+head_flag=0
+tail_flag=0
+base_url="https://wallhaven.cc/search?q="
+rest="&categories=110&purity=100&sorting=relevance&order=desc&page="
 dferror="FlagError: can't use both flags at the same time."
 sferror="FlagError: can't use same flags more than once."
 
-help() { 
-  echo "Usage: ${0##*/} [ -q \"query\" ] [ -p/-t <int> ]" 1>&2 
+help_sec () {
+    while IFS= read -r line; do
+    printf "%s\n" "$line"
+	done <<-EOF
+	Usage:
+	    ${0##*/} [-p <int> | -t <int>] [-q <query>]
+	    ${0##*/} -h
+	
+	Options:
+	    -h show helptext
+	    -p downloads from head of the query dump
+	    -t downloads from tail of the query dump
+      -q takes query as a parameter
+	EOF
 }
 
-force_exit() { 
-  help
+die() { 
+  printf "$a_red%s$a_reset\n" "$*" >&2
   exit 1
+}
+
+yprint () {
+	printf "$a_yellow%s$a_reset\n" "$*" >&2
+}
+
+gprint () {
+  printf "$a_green%s$a_reset\n" "$*" 
+}
+
+c_print () {
+  printf "$a_cyan%s$a_reset\n" "$*" 
+}
+
+flagstat() {
+  printf "1) head\n2) tail\n: " 
+  read -r sel && [ $sel -eq 1 ] && head_flag=1 || tail_flag=1 
+}
+
+get_ldump() {
+    
+    link_dump+=$(curl -s "${base_url}${enc_query}${rest}$1" \
+     | grep -Eo "https:\/\/th.wallhaven.cc\/small\/\w{2}\/\w{6}.jpg"; echo " ")
 }
 
 while getopts ":q:p:t:h" flags; do
@@ -29,100 +68,68 @@ while getopts ":q:p:t:h" flags; do
           query="${OPTARG}"
           ;;
        p) 
-          head_flag+=1
-          if (( tail_flag==1 )); then
-            echo $dferror
-            force_exit
-          else 
-            if (( head_flag>1 )); then
-              echo $sferror
-              force_exit
-            fi
-          fi
+          head_flag=$(( head_flag + 1 ))
+          [ $tail_flag -eq 1 ] && die $dferror || [ $head_flag -gt 1 ] && die $sferror
           getcnt=${OPTARG}
           ;;
        t) 
-          tail_flag+=1
-          if (( head_flag==1 )); then
-            echo $dferror
-            force_exit
-          else 
-            if (( tail_flag>1 )); then
-              echo $sferror
-              force_exit
-            fi
-          fi
+          tail_flag=$(( tail_flag + 1 ))
+          [ $head_flag -eq 1 ] && die $dferror || [ $tail_flag -gt 1 ] &&  die $sferror
           getcnt=${OPTARG}
           ;;
-       *) 
-          help
-          printf "Cli Option:- \n\
-        -q = specify the query string\
-          \n\t-p = specify n to download n no.s of jpeg files from top\
-          \n\t-t = specify n to download n no.s of jpeg files from bottom\
-          \n\t-h = show help section\n"
+       *|h) 
+          help_sec
           exit 1
           ;;
      esac
 done
 
-getf() {
-  printf "1) top\n2) bottom\n: " 
-  read -r sel
-  if (( sel == 1 )); then 
-    head_flag=1
-  else 
-    tail_flag=1 
-  fi
-}
 
-[ -z "$*" ] && printf "Query: " && read -r query && getf && printf "Jpeg files count: " && read -r getcnt
+[ -z "$*" ] && printf "query: " && read -r query && flagstat && printf "Image count: " && read -r getcnt
 
 enc_query=$(echo "$query" | sed 's_ _%20_g')
 
 validate=$(curl -s  "${base_url}${enc_query}" | grep -o "There's nothing here...")
-[[ ! -z "$validate" ]] && echo "Sorry dude, something went wrong." && exit 1
+[ ! -z "$validate" ] &&  die "No search results found!"
 
-t_pages=$(curl -s "$base_url$enc_query&categories=110&purity=100&sorting=relevance&order=desc&page=2" \
-   | grep -Eo 'thumb-listing-page-num">2</span> / [0-9]{1,}'| awk 'END {print (NR > 0 && NF > 0) ? $3 : 1}')
+t_pages=$(curl -s "${base_url}${enc_query}${rest}2" | grep -Eo 'thumb-listing-page-num">2</span> / [0-9]{1,}'| \
+          awk 'END {print (NR > 0 && NF > 0) ? $3 : 1}')
 
-wpcnt=$(curl -s "${base_url}${enc_query}" | grep -Eo '[0-9,]{1,} Wallpapers found  for' | sed -E 's_([0-9,]{1,})(.*)_\1_g' | tr -d ',')
-printf "Found %d jpeg files for the query: %s\n" "$wpcnt" "$query"
+wpcnt=$(curl -s "${base_url}${enc_query}" | grep -Eo '[0-9,]{1,} Wallpapers found  for' | \
+        sed -E 's_([0-9,]{1,})(.*)_\1_g' | tr -d ',')
+        
+c_print $(printf "Found %d jpeg files for the query: %s\n" "$wpcnt" "$query")
 
-if [[ $getcnt -gt $wpcnt ]]; then
+if [ $getcnt -gt $wpcnt ]; then
      getcnt=$wpcnt
-     printf "Query out of range. Defaulting to %s\n" "$getcnt"
+     yprint $(printf "Query out of range. Defaulting to %s\n" "$getcnt")
      l_pages=$t_pages
-elif [[ $(( $getcnt % 24 )) == 0 ]]; then
+
+elif [ $(( $getcnt % 24 )) -eq 0 ]; then
      l_pages=$(( $getcnt / 24 ))
+     
 else
      l_pages=$(expr $(( $getcnt / 24 )) + 1)
 fi
 
+gprint $(printf "Fetching %d jpeg type image files\n" "$getcnt")
 
-get_ldump() {
-    
-    link_dump+=$(curl -s "$base_url$enc_query&categories=110&purity=100&sorting=relevance&order=desc&page=$1" \
-     | grep -Eo "https:\/\/th.wallhaven.cc\/small\/\w{2}\/\w{6}.jpg"; echo " ")
-}
 
-if (( head_flag == 1 )); then
-    for (( i=1 ; i <= $l_pages ; i++ )); do
-	get_ldump $i
+if [ $head_flag -eq 1 ]; then
+    i=1
+    while [ $i -le $l_pages ]; do
+	    get_ldump $i
+      i=$(( i + 1 ))
     done
 
-elif (( tail_flag == 1 )); then
-    for (( i=$t_pages; i >= $(( $t_pages - $l_pages )); i-- )); do
-	get_ldump $i
-    done
-fi
-
-printf "Fetching %d jpeg image files for the query: %s\n" "$getcnt" "$query"
-
-if (( head_flag == 1 )); then
-	wget -q $(echo $link_dump | sed 's_ _\n_g' | head -n $getcnt)
 else
-	wget -q $(echo $link_dump | sed 's_ _\n_g' | tail -n $getcnt)
-
+    i=$t_pages
+    while [ $i -ge $(( $t_pages - $l_pages )) ]; do
+	    get_ldump $i
+      i=$(( i - 1 ))
+    done
 fi
+
+[ $head_flag -eq 1 ] && wget -q $(echo $link_dump | sed 's_ _\n_g' | head -n $getcnt) || wget -q $(echo $link_dump | sed 's_ _\n_g' | tail -n $getcnt)
+
 rm -f *.jpg.*
