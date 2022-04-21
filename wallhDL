@@ -86,10 +86,7 @@ validate=$(curl -s  "${base_url}${enc_query}" | grep -o "There's nothing here...
 t_pages=$(curl -s "$base_url$enc_query&categories=110&purity=100&sorting=relevance&order=desc&page=2" \
    | grep -Eo 'thumb-listing-page-num">2</span> / [0-9]{1,}'| awk 'END {print (NR > 0 && NF > 0) ? $3 : 1}')
 
-last_page_file_count=$(curl -s "${base_url}${enc_query}&categories=110&purity=100&sorting=relevance&order=desc&page=${t_pages}" \
-	| grep -Eo "https:\/\/th.wallhaven.cc\/small\/\w{2}\/\w{6}.jpg" | wc -l)
-
-wpcnt=$(( ${last_page_file_count} + $(expr 24 \* $(( ${t_pages} - 1 ))) ))
+wpcnt=$(curl -s "${base_url}${enc_query}" | grep -Eo '[0-9,]{1,} Wallpapers found  for' | sed -E 's_([0-9,]{1,})(.*)_\1_g' | tr -d ',')
 printf "Found %d jpeg files for the query: %s\n" "$wpcnt" "$query"
 
 if [[ $getcnt -gt $wpcnt ]]; then
@@ -123,9 +120,9 @@ fi
 printf "Fetching %d jpeg image files for the query: %s\n" "$getcnt" "$query"
 
 if (( head_flag == 1 )); then
-	wget -s $(echo $link_dump | sed 's_ _\n_g' | head -n $getcnt)
+	wget -q $(echo $link_dump | sed 's_ _\n_g' | head -n $getcnt)
 else
-	wget -s $(echo $link_dump | sed 's_ _\n_g' | tail -n $getcnt)
+	wget -q $(echo $link_dump | sed 's_ _\n_g' | tail -n $getcnt)
 
 fi
 rm -f *.jpg.*
