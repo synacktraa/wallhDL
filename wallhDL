@@ -55,10 +55,14 @@ flagstat() {
   read -r sel && [ $sel -eq 1 ] && head_flag=1 || tail_flag=1 
 }
 
-get_ldump() {
+fetch_link() {
     
     link_dump+=$(curl -s "${base_url}${enc_query}${rest}$1" \
      | grep -Eo "https:\/\/th.wallhaven.cc\/small\/\w{2}\/\w{6}.jpg"; echo " ")
+}
+
+dl() {
+  wget -q $(echo $1 | sed 's_ _\n_g' | $2 -n $3)
 }
 
 while getopts ":q:p:t:h" flags; do
@@ -118,18 +122,18 @@ gprint $(printf "Fetching %d jpeg type image files\n" "$getcnt")
 if [ $head_flag -eq 1 ]; then
     i=1
     while [ $i -le $l_pages ]; do
-	    get_ldump $i
+	    fetch_link $i
       i=$(( i + 1 ))
     done
 
 else
     i=$t_pages
     while [ $i -ge $(( $t_pages - $l_pages )) ]; do
-	    get_ldump $i
+	    fetch_link $i
       i=$(( i - 1 ))
     done
 fi
 
-[ $head_flag -eq 1 ] && wget -q $(echo $link_dump | sed 's_ _\n_g' | head -n $getcnt) || wget -q $(echo $link_dump | sed 's_ _\n_g' | tail -n $getcnt)
+[ $head_flag -eq 1 ] && dl "$link_dump" "head" $getcnt || dl "$link_dump" "tail" $getcnt
 
 rm -f *.jpg.*
