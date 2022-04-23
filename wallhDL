@@ -137,7 +137,7 @@ else
      l_pages=$(expr $(( $getcnt / 24 )) + 1)
 fi
 
-gprint $(printf "Fetching %d jpeg type image files\n" "$getcnt")
+gprint $(printf "Fetching %d image files...\n" "$getcnt")
 
 
 if [ $head_flag -eq 1 ]; then
