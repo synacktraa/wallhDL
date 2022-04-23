@@ -1,8 +1,8 @@
 #!/bin/bash
 
-a_red="\033[1;31m"
+a_red="\u001b[31m"
 a_green="\033[1;32m"
-a_yellow="\033[1;33m"
+a_yellow=" \u001b[33m"
 a_blue="\033[1;34m"
 a_magenta="\033[1;35m"
 a_cyan="\033[1;36m"
@@ -13,6 +13,7 @@ tail_flag=0
 s_flag=0
 l_flag=0
 
+walldir="$HOME/.local/share/wallhaven"
 base_url="https://wallhaven.cc/search?q="
 rest="&categories=110&purity=100&sorting=relevance&order=desc&page="
 dferror="FlagError: can't use both flags at the same time."
@@ -78,6 +79,8 @@ large_dl() {
  
 }
 
+mkdir -p $walldir
+
 while getopts ":q:p:t:hsl" flags; do
     case "${flags}" in
     
@@ -137,7 +140,7 @@ else
      l_pages=$(expr $(( $getcnt / 24 )) + 1)
 fi
 
-gprint $(printf "Fetching %d image files...\n" "$getcnt")
+gprint $(printf "Fetching %d wallpapers...\n" "$getcnt")
 
 
 if [ $head_flag -eq 1 ]; then
@@ -155,6 +158,7 @@ else
     done
 fi
 
+cd $walldir
 if [ $s_flag -eq 1 ]; then
     [ $head_flag -eq 1 ] && small_dl "$link_dump" "head" $getcnt || small_dl "$link_dump" "tail" $getcnt
 else
@@ -166,3 +170,6 @@ else
 fi
 
 rm -f *.jpg.* *.png.*
+yprint "wallpapers downloaded in: $walldir"
+# sxiv $(ls -c)
+
