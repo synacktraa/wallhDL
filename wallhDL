@@ -12,7 +12,9 @@ tail_flag=0
 s_flag=0
 l_flag=0
 
+# saves wallpaper in "$HOME/.local/share/wallhaven" directory
 walldir="$HOME/.local/share/wallhaven"
+
 base_url="https://wallhaven.cc/search?q="
 rest="&categories=110&purity=100&sorting=relevance&order=desc&page="
 dferror="FlagError: can't use both flags at the same time."
@@ -61,18 +63,36 @@ sizestat() {
   yprint "1) small 2) full: " 
   read -r sel && [ $sel -eq 1 ] && s_flag=1 || l_flag=1 
 }
+
+# check dependencies
+dep_chk () {
+	for cm; do
+		command -v $cm >/dev/null 2>&1 || die "$cm - command not found, install: $cm"
+	done
+}
+
+dep_chk "sxiv" "curl" "wget" 
+
+# fetches jpeg image urls from specified page
 fetch_link() {
     
     link_dump+=$(curl -s "${base_url}${enc_query}${rest}$1" \
      | grep -Eo "https:\/\/th.wallhaven.cc\/small\/\w{2}\/\w{6}.jpg"; echo " ")
 }
 
+# downloads small image files
 small_dl() {
   wget -q $(echo $1 | sed 's_ _\n_g' | $2 -n $3)
 }
 
+# download full image files
 large_dl() {
+
+  # replacing small jpeg file urls with full image file urls
   fullimg=$(echo $1|tr ' ' '\n' | $2 -n $3|sed -E 's_th(\.wallhaven\.cc\/)small(\/\w{2}\/)(\w{6}\.)\w{3}_w\1full\2wallhaven-\3_g')
+
+  # I can't come up with a better solution than this, It tries to download same urls with 
+  # both jpg and png, so it doesn't fail to download user specified amount of wallpapers. 
   wget -q $(echo $fullimg |tr ' ' '\n'| sed -E 's|(.*)|\1jpg|g')
   wget -q -N $(echo $fullimg |tr ' ' '\n'| sed -E 's|(.*)|\1png|g')
  
@@ -114,20 +134,25 @@ done
 
 [ -z "$*" ] && yprint "query: " && read -r query && fromloc && yprint "Image count: " && read -r getcnt && sizestat
 
+# encoding the query
 enc_query=$(echo "$query" | sed 's_ _%20_g')
 
+# checking if the query exists
 validate=$(curl -s  "${base_url}${enc_query}" | grep -o "There's nothing here...")
 [ ! -z "$validate" ] &&  die "No search results found!"
 
+# getting total number of pages for the query
 t_pages=$(curl -s "${base_url}${enc_query}${rest}2" | grep -Eo 'thumb-listing-page-num">2</span> / [0-9]{1,}'| \
           awk 'END {print (NR > 0 && NF > 0) ? $3 : 1}')
 
+# getting total number of wallpapers for the query
 wpcnt=$(curl -s "${base_url}${enc_query}" | grep -Eo '[0-9,]{1,} Wallpapers found  for' | \
         sed -E 's_([0-9,]{1,})(.*)_\1_g' | tr -d ',')
         
 c_print $(printf "Found %d image files for the query: %s\n" "$wpcnt" "$query")
 
 if [ $getcnt -gt $wpcnt ]; then
+    # if user specifies more than available wallpaper count, it defaults to maximum count
      getcnt=$wpcnt
      mprint $(printf "Query out of range. Defaulting to %s\n" "$getcnt")
      l_pages=$t_pages
@@ -144,6 +169,7 @@ gprint $(printf "Fetching %d wallpapers...\n" "$getcnt")
 
 if [ $head_flag -eq 1 ]; then
     i=1
+    # fetching urls from top
     while [ $i -le $l_pages ]; do
 	    fetch_link $i
       i=$(( i + 1 ))
@@ -151,6 +177,7 @@ if [ $head_flag -eq 1 ]; then
 
 else
     i=$t_pages
+    # fetching urls from bottom
     while [ $i -ge $(( $t_pages - $l_pages )) ]; do
 	    fetch_link $i
       i=$(( i - 1 ))
@@ -159,8 +186,11 @@ fi
 
 cd $walldir
 if [ $s_flag -eq 1 ]; then
+    # downloads small jpeg files
     [ $head_flag -eq 1 ] && small_dl "$link_dump" "head" $getcnt || small_dl "$link_dump" "tail" $getcnt
 else
+    # downloads full size image files
+
     if [ $head_flag -eq 1 ]; then
       large_dl "$link_dump" "head" $getcnt
     else
@@ -168,7 +198,10 @@ else
     fi
 fi
 
+# removes duplicate files
 rm -f *.jpg.* *.png.*
 printf "\u001b[7mwallpapers downloaded in\u001b[0m: \u001b[37;1m\u001b[4m$walldir\u001b[0m\u001b[0m\n"
+
+#display images with sxiv
 sxiv $(ls -c)
 
