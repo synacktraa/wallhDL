@@ -1,12 +1,11 @@
 #!/bin/bash
 
 a_red="\u001b[31m"
-a_green="\033[1;32m"
-a_yellow=" \u001b[33m"
-a_blue="\033[1;34m"
-a_magenta="\033[1;35m"
-a_cyan="\033[1;36m"
-a_reset="\033[0m"
+a_green="\u001b[32m"
+a_yellow="\u001b[33m"
+a_magenta="\u001b[35m"
+a_cyan="\u001b[36m"
+a_reset="\u001b[0m"
 
 head_flag=0
 tail_flag=0
@@ -170,6 +169,6 @@ else
 fi
 
 rm -f *.jpg.* *.png.*
-yprint "wallpapers downloaded in: $walldir"
-# sxiv $(ls -c)
+printf "\u001b[7mwallpapers downloaded in\u001b[0m: \u001b[37;1m\u001b[4m$walldir\u001b[0m\u001b[0m\n"
+sxiv $(ls -c)
 
