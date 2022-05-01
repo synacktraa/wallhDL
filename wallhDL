@@ -71,7 +71,7 @@ dep_chk () {
 	done
 }
 
-dep_chk "sxiv" "curl" "wget" 
+dep_chk "curl" "wget" 
 
 # fetches jpeg image urls from specified page
 fetch_link() {
@@ -201,7 +201,3 @@ fi
 # removes duplicate files
 rm -f *.jpg.* *.png.*
 printf "\u001b[7mwallpapers downloaded in\u001b[0m: \u001b[37;1m\u001b[4m$walldir\u001b[0m\u001b[0m\n"
-
-#display images with sxiv
-sxiv $(ls -c)
-
