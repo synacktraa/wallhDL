@@ -98,7 +98,6 @@ large_dl() {
  
 }
 
-mkdir -p $walldir
 
 while getopts ":q:p:t:hsl" flags; do
     case "${flags}" in
@@ -184,7 +183,9 @@ else
     done
 fi
 
-cd $walldir
+querydir=$(printf $walldir/; echo $query | tr ' ' '_')
+mkdir -p $querydir && cd $querydir
+
 if [ $s_flag -eq 1 ]; then
     # downloads small jpeg files
     [ $head_flag -eq 1 ] && small_dl "$link_dump" "head" $getcnt || small_dl "$link_dump" "tail" $getcnt
@@ -200,4 +201,4 @@ fi
 
 # removes duplicate files
 rm -f *.jpg.* *.png.*
-printf "\u001b[7mwallpapers downloaded in\u001b[0m: \u001b[37;1m\u001b[4m$walldir\u001b[0m\u001b[0m\n"
+printf "\u001b[7mwallpapers downloaded in\u001b[0m: \u001b[37;1m\u001b[4m$querydir\u001b[0m\u001b[0m\n"
